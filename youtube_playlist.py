@@ -78,10 +78,18 @@ with open(html_filename, encoding="utf8") as fp:
             index_find = re.search(regex_index, href)
             index = index_find.group()
 
+            time_span_id = 'ytd-thumbnail-overlay-time-status-renderer'
+            for parent_span in link.parent.parent.parent.find_all('span'):
+                classes = parent_span.get('class')
+                if classes != None and time_span_id in classes:
+                    print(parent_span.text.strip())
+
+
+
             #extract channel name from grand parent
             for grandparent_link in link.parent.parent.find_all('a'):
                 classes = grandparent_link.get('class')
                 if classes != None and "yt-formatted-string" in classes:
-                    channel_name = grandparent_link.text
-                    print(index, uid, title, channel_name)
+                    channel_name = grandparent_link.text                    
+                    #print(index, uid, title, channel_name)
 
