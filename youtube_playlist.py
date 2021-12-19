@@ -1,87 +1,64 @@
 from bs4 import BeautifulSoup
 import re
+import csv
 
-html_filename = 'food - YouTube.htm'
+def playlist_parse(html_filename):
+    with open(html_filename, encoding="utf8") as fp:
+        
+        video_list = []
+        video_list.append(('index', 'uid', 'title', 'duration', 'channel_name'))
+        soup = BeautifulSoup(fp, "html.parser")
 
-regex_uid = r"(?<=v=)[^&]*"
-regex_index = r"(?<=&index=)\d*"
+        regex_uid = r"(?<=v=)[^&]*"
+        regex_index = r"(?<=&index=)\d*"
+        for link in soup.find_all('a'):
+            link_id = link.get('id')
 
-'''
-#prints index, video uid and video title
-with open(html_filename, encoding="utf8") as fp:
-    soup = BeautifulSoup(fp, "html.parser")
-    for link in soup.find_all('a'):
-        link_id = link.get('id')
-        #print(link)
-        if link_id == "video-title":    
-            title = link.get('title')
-            href = link.get('href')
-            
-            #print(link_id)
-            #print(title)
-            #print(href)
-            
-            uid_find = re.search(regex_uid, href)
-            #if uid_find != None:
-            uid = uid_find.group()
-            #print(uid)  
-            
-            index_find = re.search(regex_index, href)
-            #if index_find != None:
-            index = index_find.group()
-            #print(index)  
-            
-            print(index, uid, title)
-            #print(link)
+            if link_id == "video-title":
+                #get title:    
+                title = link.get('title')
+
+                href = link.get('href')
                 
-            
-        #    print(link)
-        #print(link.get('href'))
-'''
+                #extract video uid from href:
+                uid_find = re.search(regex_uid, href)
+                uid = uid_find.group()
+                
+                #extract video playlist index from href
+                index_find = re.search(regex_index, href)
+                index = index_find.group()
 
-'''
-#prints own channel name too
-with open(html_filename, encoding="utf8") as fp:
-    soup = BeautifulSoup(fp, "html.parser")
-    for a in soup.find_all('a'):
-        #print(a)
-        classes = a.get('class')
-        #print(classes)
-        #print(a.text)
-        #"yt-simple-endpoint style-scope yt-formatted-string"
-        if classes != None and "yt-formatted-string" in classes:
-            #print(div)   
-            #print(div.get('id'))
-            print(a.text)
-            # print(a)
-'''
+                #get duration:
+                time_span_id = 'ytd-thumbnail-overlay-time-status-renderer'
+                ggp_spans = link.parent.parent.parent.find_all('span')
+                duration = next(filter(lambda s: s.get('class') != None and time_span_id in s.get('class'), ggp_spans), None)
+                if duration == None:
+                    duration = '0'
+                else:
+                    duration = duration.text.strip()
+
+                #get channel name:
+                channel_name_class = 'yt-formatted-string'
+                gp_links = link.parent.parent.find_all('a')
+                channel_name = next(filter(lambda l: l.get('class') != None and channel_name_class in l.get('class'), gp_links), None).text
+
+                video_list.append((index, uid, title, duration, channel_name))
+    return video_list
+
+def write_playlist(video_list, csv_filename):
+    #use utf-8 encoding, because video titles can contain unicode characters
+    #set newline to empty as csv-writer adds newlines too
+    with open(csv_filename, 'w', encoding='utf-8', newline='') as f: 
+        # use tab as delimiter, because video titles and channels can contain punctuation
+        write = csv.writer(f, delimiter='\t') 
+        write.writerows(video_list) 
 
 
-#uses grand parent tag of video url to find channel name of video            
-with open(html_filename, encoding="utf8") as fp:
-    soup = BeautifulSoup(fp, "html.parser")
-    for link in soup.find_all('a'):
-        link_id = link.get('id')
+import os
+playlist_html_files = [each for each in os.listdir() if each.endswith('.htm') or each.endswith('html') ]
 
-        classes = link.get('class')
-
-        if link_id == "video-title":    
-            title = link.get('title')
-
-            href = link.get('href')
-            
-            #extract video uid from href:
-            uid_find = re.search(regex_uid, href)
-            uid = uid_find.group()
-            
-            #extract video playlist index from href
-            index_find = re.search(regex_index, href)
-            index = index_find.group()
-
-            #extract channel name from grand parent
-            for grandparent_link in link.parent.parent.find_all('a'):
-                classes = grandparent_link.get('class')
-                if classes != None and "yt-formatted-string" in classes:
-                    channel_name = grandparent_link.text
-                    print(index, uid, title, channel_name)
-
+for f_name in playlist_html_files:
+    print('parsing {}'.format(f_name))     
+    video_list = playlist_parse(f_name)
+    list_name = os.path.splitext(f_name)[0].removesuffix(" - YouTube")
+    write_playlist(video_list, list_name + '.csv')
