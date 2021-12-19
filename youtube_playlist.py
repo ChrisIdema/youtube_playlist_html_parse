@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup
 import re
-
+import csv
 
 def playlist_parse(html_filename):
     with open(html_filename, encoding="utf8") as fp:
@@ -31,7 +31,11 @@ def playlist_parse(html_filename):
                 #get duration:
                 time_span_id = 'ytd-thumbnail-overlay-time-status-renderer'
                 ggp_spans = link.parent.parent.parent.find_all('span')
-                duration = next(filter(lambda s: s.get('class') != None and time_span_id in s.get('class'), ggp_spans), None).text.strip()
+                duration = next(filter(lambda s: s.get('class') != None and time_span_id in s.get('class'), ggp_spans), None)
+                if duration == None:
+                    duration = '0'
+                else:
+                    duration = duration.text.strip()
 
                 #get channel name:
                 channel_name_class = 'yt-formatted-string'
@@ -41,15 +45,20 @@ def playlist_parse(html_filename):
                 video_list.append((index, uid, title, duration, channel_name))
     return video_list
 
-html_filename = 'food - YouTube.htm'
+def write_playlist(video_list, csv_filename):
+    #use utf-8 encoding, because video titles can contain unicode characters
+    #set newline to empty as csv-writer adds newlines too
+    with open(csv_filename, 'w', encoding='utf-8', newline='') as f: 
+        # use tab as delimiter, because video titles and channels can contain punctuation
+        write = csv.writer(f, delimiter='\t') 
+        write.writerows(video_list) 
 
-video_list = playlist_parse(html_filename)
 
-import csv 
+import os
+playlist_html_files = [each for each in os.listdir() if each.endswith('.htm') or each.endswith('html') ]
 
-#use utf-8 encoding, because video titles can contain unicode characters
-#set newline to empty as csv-writer adds newlines too
-with open('food.csv', 'w', encoding='utf-8', newline='') as f: 
-    # use tab as delimiter, because video titles and channels can contain punctuation
-    write = csv.writer(f, delimiter='\t') 
-    write.writerows(video_list) 
+for f_name in playlist_html_files:
+    print('parsing {}'.format(f_name))     
+    video_list = playlist_parse(f_name)
+    list_name = os.path.splitext(f_name)[0].removesuffix(" - YouTube")
+    write_playlist(video_list, list_name + '.csv')
